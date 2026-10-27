@@ -11,7 +11,7 @@ release.mkdir(exist_ok=True)
 version = json.loads((root / 'package.json').read_text(encoding='utf-8'))['version']
 package = release / f'dsh-library-{version}.tgz'
 fixed = {'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', '.npmrc', '.gitignore', 'index.js', 'client.js', 'cordis.patch.yml', 'icon.svg', 'README.md', 'LICENSE', 'CHANGELOG.md', 'SECURITY.md', 'CONTRIBUTING.md'}
-allowed = {'src': {'.js'}, 'test': {'.js'}, 'scripts': {'.mjs', '.py'}, 'docs': {'.md', '.jpg'}, 'locale': {'.json'}, '.github': {'.yml', '.yaml', '.md'}}
+allowed = {'src': {'.js'}, 'test': {'.js', '.mjs'}, 'scripts': {'.mjs', '.py'}, 'docs': {'.md', '.jpg'}, 'locale': {'.json'}, '.github': {'.yml', '.yaml', '.md'}}
 blocked = {'node_modules', '__pycache__', '.git', '.dsh', 'data', 'libraries', 'release', 'credentials', 'secrets'}
 
 def safe(relative):
