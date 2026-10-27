@@ -1,0 +1,3 @@
+# Flat layout also works with Windows sandboxed Node resolvers.
+nodeLinker: hoisted
+autoInstallPeers: true

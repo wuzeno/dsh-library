@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Project Libraries",
+    "description": "Automatically create a library for each new workspace, keep libraries in a local folder you choose, and manage them from one Libraries menu. Import any file format by copying originals without changing the source. Choose whether each conversation may reference its library. Management UI is Chinese."
+  }
+}

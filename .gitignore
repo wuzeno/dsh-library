@@ -1,0 +1,18 @@
+node_modules/
+.pnpm-store/
+release/
+coverage/
+.test-data-*/
+.host-test-*/
+*.log
+*.tgz
+.env
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db
+# Never commit library data or local DSH profile/config/credentials.
+data/
+libraries/
+.dsh/
+.dsh-library.json
