@@ -1,7 +1,7 @@
 # 贡献指南
 
 1. 安装 Node 24 LTS 与 pnpm，运行 `pnpm install --ignore-scripts`。
-2. 执行 `pnpm run test:all`。Windows沙箱环境使用项目提供的 `--test-isolation=none` 避免测试runner建立受限子进程管道；测试仍实际执行。
+2. 执行 `pnpm run test:all`。默认使用 Node 22/24 均支持的 `node --test`。若 Windows 沙箱限制测试 runner 的子进程管道，可在支持该选项的 Node 24 环境单独运行 `node --test --test-isolation=none`；这不能绕过解析器子进程本身的权限限制。
 3. 不在仓库里保存资料库数据，不连接真实私人资料做破坏性测试。测试临时目录必须位于项目、使用随机名，并在删除前验证绝对路径归属。
 4. 对变更增加回归测试。涉及权限的操作，明确区分用户确认与AI请求，模型不能批准自己的越权操作。
 5. DSH接口变更先通过Inspect核实，不替换宿主root、不修改宿主源码、不依赖私有DOM结构。

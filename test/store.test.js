@@ -7,6 +7,8 @@ import { LibraryStore, initialState, MAX_FILE_BYTES, assertPlainPath } from '../
 const code = expected => error => { assert.equal(error.code, expected); return true; };
 const encode = text => Buffer.from(text).toString('base64');
 const project = path.resolve(import.meta.dirname, '..');
+// Windows directory junctions use rmdir; Unix directory symlinks use unlink.
+const removeDirectoryLink = target => process.platform === 'win32' ? rmdir(target) : unlink(target);
 async function fixture(run) {
   const directory = await mkdtemp(path.join(project, '.test-data-'));
   const ws = [{ id: 'w1', title: '工作区一', path: path.join(directory, 'source'), sessionIds: new Set(['s1']) }, { id: 'w2', title: '工作区二', sessionIds: new Set(['s2']) }];
@@ -309,7 +311,7 @@ test('realpath aliases in legacy records cannot bypass root or recursive-delete 
     await assert.rejects(store.configure({ root: lib.path }), code('NESTED_LIBRARY_PATH'));
     store.state.settings.root = lib.path;
     await assert.rejects(create('w1'), code('NESTED_LIBRARY_PATH'));
-  } finally { assert.equal(path.dirname(alias), directory); await rmdir(alias); }
+  } finally { assert.equal(path.dirname(alias), directory); await removeDirectoryLink(alias); }
 }));
 
 test('scope limit includes the automatic default library and counts unique grants', () => fixture(async ({ store, configure, create }) => {
@@ -511,7 +513,7 @@ test('symlink/junction paths refused for settings and original downloads', t => 
     } catch (error) { if (['EPERM', 'EACCES', 'ENOTSUP'].includes(error.code)) { t.diagnostic(`已验证目录链接；文件链接权限不足：${error.code}`); return; } throw error; }
     try { await assert.rejects(store.originalForSession('s1', { libraryId: lib.id, fileId: file.id }), code('UNSAFE_PATH')); }
     finally { assert.equal(path.dirname(original), path.join(lib.path, 'originals')); await unlink(original); }
-  } finally { assert.equal(path.dirname(path.resolve(link)), path.resolve(directory)); await rmdir(link); }
+  } finally { assert.equal(path.dirname(path.resolve(link)), path.resolve(directory)); await removeDirectoryLink(link); }
 }));
 
 const recycle = (store, libraryId, file) => store.fileAction({ action: 'trashFile', libraryId, fileId: file.id, confirmation: file.name });
@@ -603,7 +605,7 @@ test('purge refuses directories and junctions at either fixed deletion target', 
   try {
     await assert.rejects(store.purgeFile({ libraryId: lib.id, fileId: file.id, confirmation: file.name }), code('UNSAFE_PATH'));
     assert.equal(await readFile(path.join(victim, 'keep.txt'), 'utf8'), 'source'); assert.equal(await readFile(original, 'utf8'), 'bytes');
-  } finally { assert.equal(path.dirname(extracted), path.join(lib.path, 'extracted')); await rmdir(extracted); }
+  } finally { assert.equal(path.dirname(extracted), path.join(lib.path, 'extracted')); await removeDirectoryLink(extracted); }
 }));
 
 test('purge refuses file symlinks without deleting the external target', t => fixture(async ({ directory, store, configure, create, upload }) => {

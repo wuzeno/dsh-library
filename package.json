@@ -11,7 +11,7 @@
   "engines": { "node": ">=22.13.0", "dsh": ">=0.2.1-rc.3 <0.3.0" },
   "exports": { ".": "./index.js", "./client": "./client.js", "./locale/*.json": "./locale/*.json", "./icon": "./icon.svg" },
   "files": ["index.js", "client.js", "src/**/*.js", "cordis.patch.yml", "locale/*.json", "icon.svg", "README.md", "LICENSE", "CHANGELOG.md", "SECURITY.md", "docs/**/*.md", "docs/images/*.jpg"],
-  "scripts": { "test": "node --test --test-isolation=none", "check": "node scripts/check.mjs", "test:all": "node scripts/check.mjs && node --test --test-isolation=none" },
+  "scripts": { "test": "node --test", "check": "node scripts/check.mjs", "test:all": "node scripts/check.mjs && node --test" },
   "dependencies": { "zod": "^4.1.0" },
   "devDependencies": { "mammoth": "^1.9.1", "pdfjs-dist": "4.10.38" },
   "dsh": { "bundle": { "patch": "./cordis.patch.yml" }, "client": { "platform": "web", "immediately": true, "inject": ["@deepseek-ai/dsh-client-ui-conversation"] } }
