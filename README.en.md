@@ -12,6 +12,14 @@ Files stay in a local directory you choose, organized by workspace. Manage all y
 
 > The screenshots use a custom theme. The background and desktop decorations come from the theme; this plugin provides the library features. The management interface is currently in Chinese.
 
+## v1.0.1 update · General mode by default
+
+**New conversations no longer enable library mode by default.** Chat normally, then open the library scope control and enable library mode when you want to reference project files.
+
+Existing conversations keep their saved mode choices. Libraries, imported files, and storage locations stay unchanged; no re-import is needed. After updating, fully quit DSH (including its system-tray background process) and restart it so the new client and backend take effect together.
+
+[Release notes and downloads](https://github.com/wuzeno/dsh-library/releases/tag/v1.0.1)
+
 ## Features
 
 ### Keep each project's files together
