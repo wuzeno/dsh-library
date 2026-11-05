@@ -6,6 +6,8 @@ import { LibraryStore, initialState, MAX_FILE_BYTES, assertPlainPath } from '../
 
 const code = expected => error => { assert.equal(error.code, expected); return true; };
 const encode = text => Buffer.from(text).toString('base64');
+// Existing library-read scenarios explicitly opt in; fixture sessions have no saved choice by default.
+const enableLibrary = (store, sessionId = 's1') => store.setScope({ sessionId, mode: 'library', libraryIds: [] });
 const project = path.resolve(import.meta.dirname, '..');
 // Windows directory junctions use rmdir; Unix directory symlinks use unlink.
 const removeDirectoryLink = target => process.platform === 'win32' ? rmdir(target) : unlink(target);
@@ -29,6 +31,59 @@ async function fixture(run) {
     await rm(target, { recursive: true, force: true });
   }
 }
+
+test('fresh sessions default to general even when their workspace has a library and file consent', () => fixture(async ({ store, configure, create, upload }) => {
+  assert.equal(store.scope('s1').mode, 'general');
+  assert.equal(store.scope('unowned').mode, 'general');
+  await configure(); const lib = await create('w1'); const file = await upload(lib.id);
+  const before = structuredClone(store.state);
+  assert.equal(store.scope('s1').mode, 'general');
+  assert.equal(store.scope('s1').libraryId, lib.id, 'library association is retained without enabling reference mode');
+  assert.equal(store.scope('s1').originalConsent, true);
+  store.directory = async () => { throw new Error('default general mode must not access library files'); };
+  await assert.rejects(store.listForSession('s1'), code('GENERAL_MODE'));
+  await assert.rejects(store.originalForSession('s1', { libraryId: lib.id, fileId: file.id }), code('SCOPE_DENIED'));
+  assert.deepEqual(store.state, before, 'reading the default scope must not create saved choices or mutate grants');
+}));
+
+test('saved library and general choices survive restart while fresh and fork sessions stay general', () => fixture(async ({ store, configure, create, upload, ws, persisted }) => {
+  await configure(); const own = await create('w1'); const other = await create('w2'); const file = await upload(own.id);
+  await store.setScope({ sessionId: 's1', mode: 'library', libraryIds: [own.id, other.id] });
+  await store.setScope({ sessionId: 's2', mode: 'general', libraryIds: [other.id] });
+  const saved = structuredClone(persisted.at(-1));
+  const restarted = new LibraryStore({ state: saved, workspaces: () => ws, persist: async () => {} });
+  assert.equal(restarted.scope('s1').mode, 'library');
+  assert.equal(restarted.scope('s2').mode, 'general');
+  assert.equal((await restarted.originalForSession('s1', { libraryId: own.id, fileId: file.id })).name, file.name);
+  ws[0].sessionIds.add('new'); ws[0].sessionIds.add('fork');
+  for (const id of ['new', 'fork']) {
+    assert.equal(restarted.scope(id).mode, 'general');
+    assert.deepEqual(restarted.scope(id).libraryIds, [own.id]);
+    await assert.rejects(restarted.listForSession(id), code('GENERAL_MODE'));
+  }
+  await restarted.setScope({ sessionId: 's1', mode: 'general', libraryIds: [own.id, other.id] });
+  assert.equal(restarted.scope('s1').mode, 'general');
+  assert.deepEqual(restarted.scope('s1').libraryIds, [own.id, other.id], 'toggling off keeps the selected scope');
+  await assert.rejects(restarted.originalForSession('s1', { libraryId: own.id, fileId: file.id }), code('SCOPE_DENIED'));
+  await restarted.setScope({ sessionId: 's1', mode: 'library', libraryIds: [own.id, other.id] });
+  ws[0].sessionIds.delete('s1'); ws[1].sessionIds.add('s1');
+  assert.equal(restarted.scope('s1').mode, 'general', 'a saved choice cannot leak across workspace identity changes');
+  assert.deepEqual(restarted.state.sessionScopes.s2, saved.sessionScopes.s2);
+}));
+
+test('invalid or missing saved modes fail closed and a failed opt-in keeps general mode', () => fixture(async ({ store, configure, create, fail }) => {
+  await configure(); const lib = await create('w1');
+  fail(true);
+  await assert.rejects(enableLibrary(store), /persist deliberately failed/);
+  assert.equal(store.scope('s1').mode, 'general');
+  assert.deepEqual(store.state.sessionScopes, {});
+  fail(false);
+  for (const mode of [undefined, null, '', 'LIBRARY', 'unknown']) {
+    store.state.sessionScopes.s1 = { workspaceId: 'w1', defaultLibraryId: lib.id, libraryIds: [lib.id], mode };
+    assert.equal(store.scope('s1').mode, 'general');
+    await assert.rejects(store.listForSession('s1'), code('GENERAL_MODE'));
+  }
+}));
 
 test('old settings default to 50MiB and configuration validates and retains omitted values', () => fixture(async ({ store, configure, persisted }) => {
   const old = initialState(); delete old.settings.maxFileMiB;
@@ -157,6 +212,7 @@ test('default 50MiB legal upload accepted and oversized decoded or encoded uploa
 }));
 
 test('archive retains originals, removes session authorization and supports restoration', () => fixture(async ({ store, configure, create, upload }) => {
+  await enableLibrary(store, 's1');
   await configure(); const lib = await create('w1'); const file = await upload(lib.id);
   await store.update({ libraryId: lib.id, action: 'archive' });
   assert.deepEqual(store.scope('s1').libraryIds, []);
@@ -169,6 +225,7 @@ test('archive retains originals, removes session authorization and supports rest
 }));
 
 test('library deletion requires deactivation plus the exact name and removes only its own directory', () => fixture(async ({ store, configure, create, upload }) => {
+  await enableLibrary(store, 's2');
   await configure(); const lib = await create('w1'); const other = await create('w2');
   const doomed = await upload(lib.id); const kept = await upload(other.id);
   await assert.rejects(store.deleteLibrary({ libraryId: lib.id, confirmation: lib.name }), code('LIBRARY_ACTIVE'));
@@ -368,6 +425,7 @@ test('persist failure rolls metadata back and queue remains usable', () => fixtu
 
 
 test('every format saves original bytes without parsing, indexing or extraction dependencies', () => fixture(async ({ store, configure, create, ws }) => {
+  await enableLibrary(store, 's1');
   await configure(); const lib = await create('w1');
   let parsed = 0; store.parse = () => { parsed++; throw new Error('must never parse'); };
   const names = ['text.txt', 'notes.md', 'word.docx', 'scan.pdf', 'sheet.xlsx', 'slides.pptx', 'photo.png', 'sound.mp3', 'movie.mp4', 'macro.docm', 'README', 'file.自定义', 'file.html', 'bad.zip'];
@@ -392,6 +450,7 @@ test('every format saves original bytes without parsing, indexing or extraction 
 }));
 
 test('large binary import owns queued bytes, retains source metadata and disables reindex', () => fixture(async ({ store, configure, create, ws }) => {
+  await enableLibrary(store, 's1');
   await configure(); const lib = await create('w1');
   const bytes = Buffer.alloc(11 * 1024 * 1024, 65);
   const pending = store.importBytes({ libraryId: lib.id, name: 'large.txt', bytes, sourcePath: 'folder\\sub\\large.txt' });
@@ -406,6 +465,7 @@ test('large binary import owns queued bytes, retains source metadata and disable
 }));
 
 test('list is metadata-only, name/source filtered, paginated and bounded', () => fixture(async ({ store, configure, create, upload }) => {
+  await enableLibrary(store, 's1');
   await configure(); const own = await create('w1'); const other = await create('w2');
   const first = await store.importBytes({ libraryId: own.id, name: 'Alpha.TXT', sourcePath: 'Topic/Alpha.TXT', bytes: Buffer.from('body hidden keyword') });
   await upload(other.id, 'secret cross-library', 'Secret.txt');
@@ -427,11 +487,12 @@ test('list is metadata-only, name/source filtered, paginated and bounded', () =>
 }));
 
 test('list/open enforce explicit grants, current consent and general mode before file access', () => fixture(async ({ store, configure, create, upload }) => {
+  await enableLibrary(store, 's1');
   await configure(); const own = await create('w1'); const other = await create('w2');
   await upload(own.id, 'own'); const remote = await upload(other.id, 'remote');
   const args = { libraryId: other.id, fileId: remote.id };
   await assert.rejects(store.originalForSession('s1', args), code('SCOPE_DENIED'));
-  await assert.rejects(store.listForSession('unowned'), code('NO_LIBRARY'));
+  await assert.rejects(store.listForSession('unowned'), code('GENERAL_MODE'));
   await store.setScope({ sessionId: 's1', mode: 'library', libraryIds: [own.id, other.id] });
   assert.equal((await store.listForSession('s1')).total, 2);
   assert.deepEqual((await store.listForSession('s1', { libraryId: other.id })).files.map(f => f.id), [remote.id]);
@@ -446,6 +507,7 @@ test('list/open enforce explicit grants, current consent and general mode before
 }));
 
 test('legacy cloud snippet consent never silently authorizes full originals', () => fixture(async ({ store, configure, create, upload, ws }) => {
+  await enableLibrary(store, 's1');
   await configure(); const lib = await create('w1'); const file = await upload(lib.id);
   const old = structuredClone(store.state); delete old.settings.originalConsent; old.settings.cloudConsent = true;
   const restored = new LibraryStore({ state: old, workspaces: () => ws, persist: async () => {} });
@@ -459,6 +521,7 @@ test('legacy cloud snippet consent never silently authorizes full originals', ()
 }));
 
 test('legacy ready/error/stored files work without migration; exclude and trash restore exact states', () => fixture(async ({ store, configure, create, upload, ws }) => {
+  await enableLibrary(store, 's1');
   await configure(); const lib = await create('w1');
   for (const status of ['ready', 'error', 'stored']) {
     const file = await upload(lib.id, `legacy ${status}`, `${status}.pdf`);
@@ -487,6 +550,7 @@ test('legacy ready/error/stored files work without migration; exclude and trash 
 }));
 
 test('original detects size/hash changes and ownership marker tampering', () => fixture(async ({ store, configure, create, upload }) => {
+  await enableLibrary(store, 's1');
   await configure(); const lib = await create('w1'); const file = await upload(lib.id, 'original');
   const args = { libraryId: lib.id, fileId: file.id }; const filename = path.join(lib.path, 'originals', file.id + file.ext);
   await writeFile(filename, 'tampered'); // Same length: exercises SHA-256, not only stat size.
@@ -499,6 +563,7 @@ test('original detects size/hash changes and ownership marker tampering', () => 
 }));
 
 test('symlink/junction paths refused for settings and original downloads', t => fixture(async ({ directory, store, configure, create, upload }) => {
+  await enableLibrary(store, 's1');
   const target = path.join(directory, 'real-target'); const link = path.join(directory, 'linked'); await mkdir(target);
   try { await symlink(target, link, process.platform === 'win32' ? 'junction' : 'dir'); }
   catch (error) { if (['EPERM', 'EACCES', 'ENOTSUP'].includes(error.code)) { t.skip(`链接权限不足：${error.code}`); return; } throw error; }

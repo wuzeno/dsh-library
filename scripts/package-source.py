@@ -10,7 +10,7 @@ release = root / 'release'
 release.mkdir(exist_ok=True)
 version = json.loads((root / 'package.json').read_text(encoding='utf-8'))['version']
 package = release / f'dsh-library-{version}.tgz'
-fixed = {'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', '.npmrc', '.gitignore', 'index.js', 'client.js', 'cordis.patch.yml', 'icon.svg', 'README.md', 'LICENSE', 'CHANGELOG.md', 'SECURITY.md', 'CONTRIBUTING.md'}
+fixed = {'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', '.npmrc', '.gitignore', 'index.js', 'client.js', 'cordis.patch.yml', 'icon.svg', 'README.md', 'README.en.md', 'LICENSE', 'CHANGELOG.md', 'SECURITY.md', 'CONTRIBUTING.md'}
 allowed = {'src': {'.js'}, 'test': {'.js', '.mjs'}, 'scripts': {'.mjs', '.py'}, 'docs': {'.md', '.jpg'}, 'locale': {'.json'}, '.github': {'.yml', '.yaml', '.md'}}
 blocked = {'node_modules', '__pycache__', '.git', '.dsh', 'data', 'libraries', 'release', 'credentials', 'secrets'}
 

@@ -727,6 +727,34 @@ test('text-only drags and drops are ignored without importing URL text as a file
   assert.equal(drop.stopped, 0);
 });
 
+for (const mode of [undefined, null, '', 'invalid', 'general', 'library']) {
+  test(`scope ${JSON.stringify(mode)} defaults safely while preserving explicit library mode`, async () => {
+    const scope = { ...scopeFixture, libraryIds: ['l1'] };
+    if (mode === undefined) delete scope.mode;
+    else scope.mode = mode;
+    const app = harness({ ScopeControl: { 0: scope, 1: fixture(), 2: true } });
+    const tree = app.render('conversation.input.left', { sessionId: 's1' });
+    const expected = mode === 'library' ? 'library' : 'general';
+    assert.equal(field(tree, 'dshlib-mode-general').props.checked, expected === 'general');
+    assert.equal(field(tree, 'dshlib-mode-library').props.checked, expected === 'library');
+    const control = nodes(tree).find(node => node.type === 'button' && node.props['aria-haspopup'] === 'dialog');
+    assert.equal(control.props['aria-label'], `资料范围：${expected === 'general' ? '通用模式' : '研究资料'}`);
+    assert.match(control.props.title, expected === 'general' ? /不使用资料库/ : /按需参考项目文件/);
+    await dialogForm(tree).props.onSubmit(event);
+    assert.deepEqual(app.calls[0], { action: 'setSessionScope', sessionId: 's1', mode: expected, libraryIds: ['l1'] });
+  });
+}
+
+test('fresh general scope with no linked library can be confirmed without opting into library mode', async () => {
+  const scope = { libraryId: null, libraryIds: [], cloudConsent: false };
+  const app = harness({ ScopeControl: { 0: scope, 1: fixture(), 2: true } });
+  const tree = app.render('conversation.input.left', { sessionId: 's1' });
+  assert.equal(button(tree, '确认本会话范围').props.disabled, false);
+  assert.equal(field(tree, 'dshlib-mode-general').props.checked, true);
+  await dialogForm(tree).props.onSubmit(event);
+  assert.deepEqual(app.calls[0], { action: 'setSessionScope', sessionId: 's1', mode: 'general', libraryIds: [] });
+});
+
 for (const mode of ['library', 'general']) {
   test(`cross-library authorization cannot be bypassed in ${mode} mode`, async () => {
     const app = scopeHarness({ 0: mode, 1: ['l2'], 2: false });

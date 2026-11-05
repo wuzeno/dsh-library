@@ -60,11 +60,14 @@ async function fixture(run, { legacyConsent = false } = {}) {
     const body = await response.json();
     assert.equal(response.status, 200, JSON.stringify(body)); return body.value;
   };
-  const prepare = async ({ originalConsent = true, text = 'PrivateOriginalBody backup recovery', name = '证据.txt', bytes } = {}) => {
+  // Most attachment tests explicitly opt in; mode:null exercises a fresh, unselected session.
+  const prepare = async ({ originalConsent = true, text = 'PrivateOriginalBody backup recovery', name = '证据.txt', bytes, mode = 'library' } = {}) => {
     await api({ action: 'configure', root: path.join(directory, 'root'), originalConsent });
     const library = await api({ action: 'create', workspaceId: 'w1' });
     const file = await api({ action: 'import', libraryId: library.id, name, base64: Buffer.from(bytes ?? text).toString('base64') });
-    assert.equal(file.status, 'stored'); return { library, file };
+    assert.equal(file.status, 'stored');
+    if (mode !== null) await api({ action: 'setSessionScope', sessionId: 's1', mode, libraryIds: [library.id] });
+    return { library, file };
   };
   const context = id => contexts.get('dsh-library.evidence').text({ scope: { id } });
   const call = (name, args = {}, id = 's1') => tools.get(name).execute(args, { agent: { id } });
@@ -131,7 +134,7 @@ test('pre-step only admits budgets and injects small current library metadata, n
   assert.equal(await step({ decision }), decision);
   assert.match(context('s1'), /资料库模式/); assert.match(context('s1'), new RegExp(library.id));
   assert.doesNotMatch(context('s1'), /PrivateOriginalBody|backup|证据\.txt|sha256|base64/);
-  assert.equal(context('other'), '');
+  assert.match(context('other'), /^通用模式：/);
   assert.equal(savedFiles.length, 0); assert.equal(savedImages.length, 0);
 }));
 
@@ -167,6 +170,61 @@ test('general only marks mode without library metadata and denies file list/open
   await api({ action: 'setSessionScope', sessionId: 's1', mode: 'library', libraryIds: [item.library.id] });
   assert.doesNotMatch(context('s1'), /PrivateOriginalBody|attachment|证据\.txt/);
   assert.equal(savedFiles.length, 1);
+}));
+
+test('fresh sessions default to general, expose no library context, and require manual library opt-in', () => fixture(async ({ prepare, api, step, context, call, state, restart, savedFiles, savedImages }) => {
+  const item = await prepare({ mode: null, name: 'private-image.gif', bytes: Buffer.from('GIF89a') });
+  assert.equal(state().sessionScopes.s1, undefined, 'fixture must not save a default scope');
+  const marker = '通用模式：本轮不使用项目资料库，也不将历史资料库附件作为本轮回答依据；用户主动提供的其他内容仍可正常处理。';
+  assert.equal((await api({ action: 'sessionScope', sessionId: 's1' })).mode, 'general');
+  assert.equal(context('s1'), marker);
+  await step();
+  assert.equal(context('s1'), marker);
+  assert.doesNotMatch(context('s1'), new RegExp(`${item.library.id}|${item.file.id}|private-image|工作区|GIF89a`));
+  await assert.rejects(call('library_files', { query: '', offset: 0 }), errorCode('GENERAL_MODE'));
+  await assert.rejects(call('library_open', openArgs(item)), errorCode('GENERAL_MODE'));
+  assert.equal(savedFiles.length, 0); assert.equal(savedImages.length, 0);
+  await restart();
+  assert.equal((await api({ action: 'sessionScope', sessionId: 's1' })).mode, 'general');
+  await api({ action: 'setSessionScope', sessionId: 's1', mode: 'library', libraryIds: [item.library.id] });
+  await restart();
+  assert.equal((await api({ action: 'sessionScope', sessionId: 's1' })).mode, 'library', 'saved explicit opt-in survives restart');
+  await step();
+  assert.match(context('s1'), /资料库模式/);
+  assert.equal((await call('library_files', { query: '', offset: 0 })).files[0].id, item.file.id);
+  await call('library_open', openArgs(item));
+  assert.equal(savedFiles.length, 1); assert.equal(savedImages.length, 1);
+  await api({ action: 'setSessionScope', sessionId: 's1', mode: 'general', libraryIds: [item.library.id] });
+  assert.equal(context('s1'), marker);
+  await assert.rejects(call('library_files', { query: '', offset: 0 }), errorCode('GENERAL_MODE'));
+  await assert.rejects(call('library_open', openArgs(item)), errorCode('GENERAL_MODE'));
+  assert.equal(savedFiles.length, 1); assert.equal(savedImages.length, 1);
+}));
+
+test('new or fork-like session IDs and workspace migration never inherit library opt-in or cross-library grants', () => fixture(async ({ prepare, api, step, call, context, state, workspaces, savedFiles, savedImages }) => {
+  const item = await prepare();
+  workspaces.push({ id: 'w2', title: '另一个工作区', sessionIds: new Set(['s2']) });
+  const extra = await api({ action: 'create', workspaceId: 'w2', name: 'CrossLibrarySecret' });
+  await api({ action: 'setSessionScope', sessionId: 's1', mode: 'library', libraryIds: [item.library.id, extra.id] });
+  // The host contract exposes session membership, not a fork event: a fork is a new agent ID.
+  for (const id of ['fresh', 'fork-of-s1']) {
+    workspaces[0].sessionIds.add(id);
+    await step({ id });
+    const scope = await api({ action: 'sessionScope', sessionId: id });
+    assert.equal(scope.mode, 'general'); assert.deepEqual(scope.libraryIds, [item.library.id]);
+    assert.equal(state().sessionScopes[id], undefined);
+    assert.match(context(id), /^通用模式：/); assert.doesNotMatch(context(id), /CrossLibrarySecret/);
+    await assert.rejects(call('library_files', { query: '', offset: 0 }, id), errorCode('GENERAL_MODE'));
+    await assert.rejects(call('library_open', openArgs(item), id), errorCode('GENERAL_MODE'));
+  }
+  workspaces[0].sessionIds.delete('s1'); workspaces[1].sessionIds.add('s1');
+  await step({ turn: 2 });
+  const migrated = await api({ action: 'sessionScope', sessionId: 's1' });
+  assert.equal(migrated.mode, 'general'); assert.deepEqual(migrated.libraryIds, [extra.id]);
+  assert.match(context('s1'), /^通用模式：/);
+  await assert.rejects(call('library_files', { query: '', offset: 0 }), errorCode('GENERAL_MODE'));
+  for (const libraryId of [item.library.id, extra.id]) await assert.rejects(call('library_open', { libraryId, fileId: item.file.id }), errorCode('GENERAL_MODE'));
+  assert.equal(savedFiles.length, 0); assert.equal(savedImages.length, 0);
 }));
 
 test('legacy snippet consent never upgrades to original-file consent', () => fixture(async ({ api, prepare, step, call, context, state, savedFiles }) => {

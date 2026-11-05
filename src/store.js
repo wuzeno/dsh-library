@@ -496,7 +496,7 @@ export class LibraryStore {
     const valid = selected?.workspaceId === String(ws?.id || '');
     const extras = valid ? selected.libraryIds.filter(id => id !== selected.defaultLibraryId && this.state.libraries.some(x => x.id === id && !x.archived)) : [];
     const libraryIds = [...new Set([...(lib ? [lib.id] : []), ...extras])];
-    return { workspaceId: ws ? String(ws.id) : null, libraryId: lib?.id || null, libraryName: lib?.name || null, mode: valid ? selected.mode : 'library', libraryIds, cloudConsent: this.state.settings.originalConsent === true, originalConsent: this.state.settings.originalConsent === true };
+    return { workspaceId: ws ? String(ws.id) : null, libraryId: lib?.id || null, libraryName: lib?.name || null, mode: valid && selected.mode === 'library' ? 'library' : 'general', libraryIds, cloudConsent: this.state.settings.originalConsent === true, originalConsent: this.state.settings.originalConsent === true };
   }
   setScope({ sessionId, mode, libraryIds }) {
     return this.transact(async () => {

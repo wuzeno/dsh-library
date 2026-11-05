@@ -28,7 +28,7 @@ Store original files in any format. Select or drag in multiple files or entire f
 
 ### Bring relevant files into the conversation
 
-In library mode, AI can find authorized files and open the relevant originals, using the current model and available file tools to answer your questions. Conversations use the library linked to the current workspace by default. You can authorize additional libraries for that conversation, or switch back to general mode for everyday chat.
+New conversations start in **general mode**, ready for everyday chat. When you want to reference project files, open the library scope control in the conversation and switch to library mode. AI can then find and open authorized originals. Library mode uses the current workspace's linked library by default, and you can authorize additional libraries for that conversation. Existing conversations keep their saved mode choices.
 
 ### Decide which files AI can use
 
@@ -36,9 +36,9 @@ Include or exclude individual files from AI reference, download originals, or mo
 
 ## Installation
 
-The current stable release is **1.0.0**, targeting the DeepSeek Harness `0.2.1-rc.3` interface. The declared compatibility range is `>=0.2.1-rc.3 <0.3.0`, with Node.js ≥22.13.0 required. See the [validation notes](docs/validation.md) for host-version testing details.
+The current stable release is **1.0.1**, targeting the DeepSeek Harness `0.2.1-rc.3` interface. The declared compatibility range is `>=0.2.1-rc.3 <0.3.0`, with Node.js ≥22.13.0 required. See the [validation notes](docs/validation.md) for host-version testing details.
 
-1. Download the **`dsh-library-1.0.0.tgz`** plugin package from [Releases](https://github.com/wuzeno/dsh-library/releases/latest).
+1. Download the **`dsh-library-1.0.1.tgz`** plugin package from [Releases](https://github.com/wuzeno/dsh-library/releases/latest).
 2. Open the DSH plugin manager, install the local package, and enable it. If your host offers a local-directory linking option instead, extract the package and select the `package` folder containing `package.json`.
 3. Fully quit DSH, including its background process in the system tray. Start it again and refresh the page. Look for **资料库** (Library) in the sidebar.
 
@@ -49,7 +49,7 @@ When upgrading, keep your existing files. Back up both the library storage direc
 1. **Choose a storage location.** Open **资料库 → 存储与隐私** (Library → Storage & Privacy), select or enter an absolute local path on the computer running DSH, and save it.
 2. **Confirm file access.** On the same page, choose whether to allow the model to use complete original files on demand.
 3. **Add your project files.** New workspaces get libraries automatically. For an existing workspace, create or link a library, drag in files or folders, review the list, and confirm.
-4. **Ask a question.** Turn on library mode in the conversation, check which libraries are in scope, and describe what you need.
+4. **Ask a question.** New conversations start in general mode. To reference project files, open the library scope control, enable library mode, check which libraries are in scope, and describe what you need.
 
 For example: “What reference documents are in this project?” or “Use the requirements document in the library to summarize the features we need to build.”
 

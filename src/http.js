@@ -1,6 +1,6 @@
 import { LibraryError, requireValue, normalizeSourcePath } from './store.js';
 export const API_PATH = '/api/dsh-library';
-export const BACKEND_VERSION = '1.0.0';
+export const BACKEND_VERSION = '1.0.1';
 const USER_ACTIONS = new Set(['snapshot', 'configure', 'create', 'link', 'unlink', 'rename', 'archive', 'restoreLibrary', 'deleteLibrary', 'import', 'exclude', 'trashFile', 'trashAll', 'restoreFile', 'purgeFile', 'emptyTrash', 'sessionScope', 'setSessionScope']);
 
 /** A single application operation shared by UI and safe agent tools. Authority-granting actions stay HTTP-user-only. */

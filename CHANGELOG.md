@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.1 — General mode by default
+
+- 新建对话默认使用通用模式。需要参考资料时，点击对话框里的资料范围入口，手动开启资料库模式。
+- 已有对话在当前工作区内保存的资料库/通用模式选择保持不变；没有有效保存记录的对话采用新的通用模式默认值。
+- 新对话与 fork 不继承其他会话的模式或额外授权；会话归属变化后失效的选择也回退为通用模式。
+- 同步前端的模式缺省显示与后端默认值。新增未选择时不注入资料、不交付附件、手动开启后可用、重启保留选择及切回通用模式的回归覆盖。
+- New conversations now start in general mode. Explicitly saved choices remain unchanged; enable library mode when you want to reference project files.
+
+
 ## 1.0.0 — Release · Unified positioning
 
 - Promote the plugin to 1.0.0. The positioning is now stated once, in one voice, in the package description, the plugin/component card and the README opening: every workspace gets its own library automatically, all libraries live in one local folder you choose, one panel manages them, any file format can go in, and each conversation decides whether the answer may use the library.

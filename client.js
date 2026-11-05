@@ -438,7 +438,7 @@ window.__ModuleLoader__.load({
     }
     function ScopeDialog({ scope, snapshot, busy, error, onClose, onSave }) {
       const ref = useRef(null);
-      const [mode, setMode] = useState(scope.mode || 'library');
+      const [mode, setMode] = useState(scope.mode === 'library' ? 'library' : 'general');
       const [extraIds, setExtraIds] = useState((scope.libraryIds || []).filter(id => id !== scope.libraryId && snapshot.libraries.some(lib => lib.id === id && !lib.archived)));
       const [acknowledge, setAcknowledge] = useState(false);
       useEffect(() => {
@@ -508,9 +508,9 @@ window.__ModuleLoader__.load({
       };
       if (!sessionId) return null;
       const extraCount = scope ? (scope.libraryIds || []).filter(id => id !== scope.libraryId).length : 0;
-      const label = busy ? '读取资料范围…' : !scope ? error ? '资料范围 · 重试' : '资料范围…' : scope.mode === 'general' ? '通用模式' : `${scope.libraryName || '资料库模式'}${extraCount ? ` +${extraCount}` : ''}`;
+      const label = busy ? '读取资料范围…' : !scope ? error ? '资料范围 · 重试' : '资料范围…' : scope.mode !== 'library' ? '通用模式' : `${scope.libraryName || '资料库模式'}${extraCount ? ` +${extraCount}` : ''}`;
       return h('div', { className: 'dshlib', style: { height: 'auto', overflow: 'visible', background: 'transparent', display: 'inline-flex', alignItems: 'center', gap: 6, maxWidth: '100%' } }, h('style', null, CSS),
-        h(Button, { small: true, tone: 'quiet', disabled: busy, onClick: show, title: scope ? `本会话：${scope.mode === 'general' ? '不使用资料库' : '按需参考项目文件'}。点击管理授权范围。` : '点击查看本会话资料范围', 'aria-haspopup': 'dialog', 'aria-label': `资料范围：${label}`, style: { maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis' } }, h(Icon, { size: 15 }), h('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis' } }, label)),
+        h(Button, { small: true, tone: 'quiet', disabled: busy, onClick: show, title: scope ? `本会话：${scope.mode !== 'library' ? '不使用资料库' : '按需参考项目文件'}。点击管理授权范围。` : '点击查看本会话资料范围', 'aria-haspopup': 'dialog', 'aria-label': `资料范围：${label}`, style: { maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis' } }, h(Icon, { size: 15 }), h('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis' } }, label)),
         !open && error && h('span', { role: 'alert', className: 'lib-small', style: { color: 'var(--lib-error)', maxWidth: 240, overflowWrap: 'anywhere' } }, error),
         feedback && h('span', { role: 'status', className: 'lib-small lib-muted' }, feedback),
         open && scope && snapshot && h(ScopeDialog, { scope, snapshot, busy, error, onClose: () => { if (!busy) { setOpen(false); setError(null); } }, onSave: save }));
